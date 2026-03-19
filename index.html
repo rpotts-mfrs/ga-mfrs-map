@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GA MFRS Coverage Map</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #0b1f3a;
+    color: white;
+    text-align: center;
+}
+
+h1 {
+    padding: 15px;
+}
+
+#map-container {
+    position: relative;
+    max-width: 900px;
+    margin: auto;
+}
+
+svg {
+    width: 100%;
+    height: auto;
+}
+
+.county {
+    fill: #2e5fa7;
+    stroke: white;
+    stroke-width: 1;
+    cursor: pointer;
+}
+
+.county:hover {
+    fill: #4fa3ff;
+}
+
+#tooltip {
+    position: absolute;
+    background: white;
+    color: black;
+    padding: 8px;
+    border-radius: 5px;
+    display: none;
+    font-size: 14px;
+    pointer-events: none;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Georgia MFRS Coverage Map</h1>
+<p>Click your county to find your Military & Family Readiness Specialist</p>
+
+<div id="map-container">
+
+<div id="tooltip"></div>
+
+<!-- SIMPLE SAMPLE MAP (you can replace with full county SVG later) -->
+<svg viewBox="0 0 300 200">
+
+<rect class="county" x="50" y="50" width="80" height="60"
+data-name="Chatham County"
+data-rep="Ricky Potts"
+data-email="ricky.potts.mil@army.mil"></rect>
+
+<rect class="county" x="150" y="50" width="80" height="60"
+data-name="Fulton County"
+data-rep="Jane Doe"
+data-email="jane.doe.mil@army.mil"></rect>
+
+</svg>
+
+</div>
+
+<script>
+const tooltip = document.getElementById("tooltip");
+
+document.querySelectorAll(".county").forEach(county => {
+    county.addEventListener("mousemove", e => {
+        const name = county.dataset.name;
+        const rep = county.dataset.rep;
+        const email = county.dataset.email;
+
+        tooltip.style.display = "block";
+        tooltip.style.left = e.pageX + 10 + "px";
+        tooltip.style.top = e.pageY + 10 + "px";
+
+        tooltip.innerHTML = `
+            <strong>${name}</strong><br>
+            MFRS: ${rep}<br>
+            ${email}
+        `;
+    });
+
+    county.addEventListener("mouseleave", () => {
+        tooltip.style.display = "none";
+    });
+});
+</script>
+
+</body>
+</html>
