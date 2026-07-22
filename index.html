@@ -10,15 +10,15 @@
   :root {
     --navy:#0C2340;
     --gray:#6b7280;
-    --line:#cbd5e1;
-    --hover:#1d4ed8;
-    --fill:#f8fafc;
+    --line:#9AA6B2;
+    --hover:#365F8C;
+    --fill:#D2D8E0;
   }
   body {
     margin:0;
     font-family: "Segoe UI", Arial, sans-serif;
     color: var(--navy);
-    background: white;
+    background:#E7EBF0;
   }
   .wrap {
     max-width: 1200px;
@@ -51,7 +51,7 @@
     padding: 10px 12px;
     border: 1px solid var(--line);
     border-radius: 10px;
-    background: #fff;
+    background:#F1F3F6;
     box-shadow: 0 2px 10px rgba(0,0,0,.04);
   }
   .search input {
@@ -74,7 +74,7 @@
     border-radius: 16px;
     padding: 12px;
     box-shadow: 0 10px 26px rgba(0,0,0,.06);
-    background: #fff;
+    background:#F1F3F6;
   }
   svg {
     width: 100%;
@@ -86,13 +86,14 @@
     stroke: var(--line);
     stroke-width: 0.6;
     vector-effect: non-scaling-stroke;
+    transition: fill .15s ease, stroke .15s ease, opacity .15s ease;
   }
   .county.dim {
     opacity: .35;
   }
   .county.active {
     opacity: 1;
-    fill: #dbeafe;
+    fill:#B8C9DD;
     stroke: var(--hover);
     stroke-width: 1.2;
   }
@@ -100,21 +101,44 @@
     position: fixed;
     display: none;
     z-index: 9999;
-    max-width: 320px;
-    background: #ffffff;
+    width: min(720px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    background: #F4F6F8;
     border: 2px solid var(--navy);
     border-radius: 12px;
-    padding: 12px 14px;
+    padding: 14px 16px;
     box-shadow: 0 12px 28px rgba(0,0,0,.18);
-    pointer-events: none;
+    pointer-events: auto;
+    overscroll-behavior: contain;
   }
   #tooltip .countyName {
     font-weight: 800;
     letter-spacing: .6px;
+    font-size: 17px;
+    margin-bottom: 10px;
   }
-  #tooltip .mfrs {
-    margin-top: 6px;
+  #tooltip .contactGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    align-items: stretch;
+  }
+  #tooltip .contactCard {
+    min-width: 0;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px;
+    background: rgba(255,255,255,.48);
+  }
+  #tooltip .contactTitle {
+    font-weight: 800;
+    color: var(--navy);
+    margin-bottom: 5px;
+  }
+  #tooltip .contactName {
     font-weight: 700;
+    overflow-wrap: anywhere;
   }
   #tooltip .role {
     margin-top: 2px;
@@ -124,12 +148,49 @@
   #tooltip .line {
     margin-top: 8px;
     font-size: 14px;
-    line-height: 1.35;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+  #tooltip .notes {
+    margin-top: 10px;
+    padding-top: 9px;
+    border-top: 1px solid var(--line);
   }
   #tooltip a {
     color: var(--navy);
     text-decoration: underline;
     overflow-wrap: anywhere;
+    display: inline-block;
+    padding: 4px 1px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(0,0,0,.12);
+  }
+  #tooltip.pinned {
+    border-width: 3px;
+  }
+  #tooltip .pinStatus {
+    float: right;
+    color: var(--gray);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  @media (max-width: 520px), (hover: none) and (pointer: coarse) {
+    #tooltip {
+      width: calc(100vw - 20px);
+      max-height: 52vh;
+      left: 10px !important;
+      right: 10px;
+      bottom: 10px;
+      top: auto !important;
+      padding: 12px;
+      border-radius: 12px;
+    }
+    #tooltip .contactGrid {
+      grid-template-columns: 1fr;
+      gap: 9px;
+    }
   }
   .footerNote {
     margin-top: 10px;
@@ -141,7 +202,7 @@
 <body>
   <div class="wrap">
     <h1>Find Your Military & Family Readiness Specialist</h1>
-    <p class="sub">Hover (or tap on mobile) your Georgia county to see the assigned MFRS. Only one county displays at a time.</p>
+    <p class="sub">Hover over a county to preview its contacts. On a computer, click the county to pin the contact card so it remains open while you use the phone or email links. On a phone or tablet, tap the county to pin it. Select another county to change contacts, or click or tap outside the map and contact card to close it.</p>
 
     <div class="toolbar">
       <div class="search" title="Type your county (example: Chatham)">
@@ -230,13 +291,15 @@
     return `${icon} ${safe}`;
   }
 
+  let tooltipPinned = false;
+
   function formatTooltip(countyName) {
     const a = countyAssignments[countyName];
     const mfrs = a?.mfrs || "Not assigned";
     const unit = a?.unit || "";
     const phone = contactLine("📞", a?.phone, "phone");
     const email = contactLine("✉", a?.email, "email");
-    const wfwName = a?.wfwName || "";
+    const wfwName = a?.wfwName || "Not assigned";
     const wfwPhone = contactLine("📞", a?.wfwPhone, "phone");
     const wfwEmail = contactLine("✉", a?.wfwEmail, "email");
     const notes = a?.notes || "";
@@ -245,69 +308,138 @@
       : `${escapeHtml(countyName).toUpperCase()} COUNTY`;
 
     tooltip.innerHTML = `
-      <div class="countyName">${heading}</div>
-      <div class="mfrs">${escapeHtml(mfrs)}</div>
-      <div class="role">Military & Family Readiness Specialist</div>
-      ${unit ? `<div class="line"><strong>Assigned Unit:</strong><br>${escapeHtml(unit)}</div>` : ""}
-      ${(phone || email) ? `<div class="line">${phone}${phone && email ? "<br>" : ""}${email}</div>` : ""}
-      ${wfwName ? `
-        <div class="line" style="border-top:1px solid var(--line);padding-top:8px;">
-          <strong>Work for Warriors:</strong> ${escapeHtml(wfwName)}<br>
-          ${wfwPhone}${wfwPhone && wfwEmail ? "<br>" : ""}${wfwEmail}
-        </div>` : ""}
-      ${notes ? `<div class="line"><strong>Notes:</strong> ${escapeHtml(notes)}</div>` : ""}
-      ${!a ? `<div class="line" style="color:var(--gray);font-size:13px;">No assignment found in the current personnel file.</div>` : ""}
+      <div class="countyName">
+        ${heading}
+        <span class="pinStatus">${tooltipPinned ? "Pinned — click outside to close" : "Hover preview — click county to pin"}</span>
+      </div>
+
+      <div class="contactGrid">
+        <section class="contactCard" aria-label="Military and Family Readiness Specialist contact">
+          <div class="contactTitle">MFRS Contact</div>
+          <div class="contactName">${escapeHtml(mfrs)}</div>
+          <div class="role">Military & Family Readiness Specialist</div>
+          ${unit ? `<div class="line"><strong>Assigned Unit:</strong><br>${escapeHtml(unit)}</div>` : ""}
+          ${(phone || email) ? `<div class="line">${phone}${phone && email ? "<br>" : ""}${email}</div>` : ""}
+        </section>
+
+        <section class="contactCard" aria-label="Work for Warriors contact">
+          <div class="contactTitle">Work for Warriors Contact</div>
+          <div class="contactName">${escapeHtml(wfwName)}</div>
+          ${(wfwPhone || wfwEmail)
+            ? `<div class="line">${wfwPhone}${wfwPhone && wfwEmail ? "<br>" : ""}${wfwEmail}</div>`
+            : `<div class="line" style="color:var(--gray);">No contact information listed.</div>`}
+        </section>
+      </div>
+
+      ${notes ? `<div class="line notes"><strong>Notes:</strong> ${escapeHtml(notes)}</div>` : ""}
+      ${!a ? `<div class="line notes" style="color:var(--gray);font-size:13px;">No assignment found in the current personnel file.</div>` : ""}
     `;
   }
 
-  function showTooltip(evt, countyName) {
-    formatTooltip(countyName);
-    tooltip.style.display = "block";
-    moveTooltip(evt);
+  function positionTooltip() {
+    const margin = 16;
+    const isMobile = window.matchMedia("(max-width: 700px)").matches;
+
+    if (isMobile) {
+      tooltip.style.left = "10px";
+      tooltip.style.top = "auto";
+      tooltip.style.bottom = "10px";
+      return;
+    }
+
+    tooltip.style.bottom = "auto";
+    tooltip.style.top = margin + "px";
+    tooltip.style.left = "auto";
+    tooltip.style.right = margin + "px";
   }
 
-  function moveTooltip(evt) {
-    const x = evt.clientX + 14;
-    const y = evt.clientY + 14;
-    tooltip.style.left = x + "px";
-    tooltip.style.top  = y + "px";
+  function showTooltip(countyName, pinned = false) {
+    tooltipPinned = pinned;
+    tooltip.classList.toggle("pinned", tooltipPinned);
+    formatTooltip(countyName);
+    tooltip.style.display = "block";
+    positionTooltip();
   }
 
   function hideTooltip() {
+    tooltipPinned = false;
+    tooltip.classList.remove("pinned");
     tooltip.style.display = "none";
   }
 
-  // Hover behavior (desktop)
+  // Hover previews the county. A primary mouse click pins the card.
   countyPaths
+    .style("cursor", "pointer")
     .on("mouseenter", function(evt, d) {
+      if (tooltipPinned) return;
       const countyName = d.properties.NAME;
       setActiveCounty(countyName);
-      showTooltip(evt, countyName);
-      d3.select(this).style("cursor", "pointer");
-    })
-    .on("mousemove", function(evt) {
-      if (tooltip.style.display === "block") moveTooltip(evt);
+      showTooltip(countyName, false);
     })
     .on("mouseleave", function() {
-      clearActiveCounty();
-      hideTooltip();
+      // Keep the preview open so users can move to the contact links.
+    })
+    .on("pointerup", function(evt, d) {
+      // Handle desktop mouse/trackpad clicks here. Touch is handled separately below.
+      if (evt.pointerType && evt.pointerType !== "mouse" && evt.pointerType !== "pen") return;
+      if (typeof evt.button === "number" && evt.button !== 0) return;
+
+      evt.preventDefault();
+      evt.stopPropagation();
+
+      const countyName = d.properties.NAME;
+      setActiveCounty(countyName);
+      showTooltip(countyName, true);
+    })
+    .on("click", function(evt) {
+      // Prevent the synthetic click from reaching the document close handler.
+      evt.preventDefault();
+      evt.stopPropagation();
     });
 
-  // Tap behavior (mobile)
-  countyPaths.on("touchstart", function(evt, d) {
-    evt.preventDefault();
-    const countyName = d.properties.NAME;
-    setActiveCounty(countyName);
-    showTooltip(evt.touches[0], countyName);
+  tooltip.addEventListener("click", (evt) => {
+    evt.stopPropagation();
   });
 
-  // Tap outside to close (mobile)
-  document.addEventListener("touchstart", (e) => {
-    const insideSvg = svg.node().contains(e.target);
-    if (!insideSvg) {
+  tooltip.addEventListener("touchstart", (evt) => {
+    evt.stopPropagation();
+  }, { passive: true });
+
+  document.addEventListener("click", (evt) => {
+    const clickedCounty = evt.target.closest && evt.target.closest("path");
+    const clickedTooltip = tooltip.contains(evt.target);
+    const searchBox = document.getElementById("countySearch");
+    const clickedSearch = searchBox && searchBox.contains(evt.target);
+
+    if (!clickedCounty && !clickedTooltip && !clickedSearch) {
       clearActiveCounty();
       hideTooltip();
     }
+  });
+
+  // Mobile tap pins the card without suppressing links inside the card.
+  countyPaths.on("touchstart", function(evt, d) {
+    evt.preventDefault();
+    evt.stopPropagation();
+    const countyName = d.properties.NAME;
+    setActiveCounty(countyName);
+    showTooltip(countyName, true);
+  });
+
+  document.addEventListener("touchstart", (evt) => {
+    const insideSvg = svg.node().contains(evt.target);
+    const insideTooltip = tooltip.contains(evt.target);
+    const searchBox = document.getElementById("countySearch");
+    const insideSearch = searchBox && searchBox.contains(evt.target);
+
+    if (!insideSvg && !insideTooltip && !insideSearch) {
+      clearActiveCounty();
+      hideTooltip();
+    }
+  }, { passive: true });
+
+  window.addEventListener("resize", () => {
+    if (tooltip.style.display === "block") positionTooltip();
   });
 
   // SEARCH
@@ -325,19 +457,10 @@
     if (match) {
       const name = match.properties.NAME;
       setActiveCounty(name);
-      // show tooltip near the search bar (not mouse)
-      const r = input.getBoundingClientRect();
-      formatTooltip(name);
-      tooltip.style.display = "block";
-      tooltip.style.left = (r.left + 10) + "px";
-      tooltip.style.top  = (r.bottom + 10) + "px";
+      showTooltip(name, true);
     } else if ("out of state".startsWith(q) || "out of state".includes(q)) {
       clearActiveCounty();
-      const r = input.getBoundingClientRect();
-      formatTooltip("Out of State");
-      tooltip.style.display = "block";
-      tooltip.style.left = (r.left + 10) + "px";
-      tooltip.style.top  = (r.bottom + 10) + "px";
+      showTooltip("Out of State", true);
     } else {
       clearActiveCounty();
       hideTooltip();
